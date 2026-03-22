@@ -2,11 +2,16 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/whysooharsh/rate-limiter/store"
 )
+
+type ConfigRequest struct {
+	ClientID   string `json:"client_id"`
+	MaxTokens  int    `json:"max_tokens"`
+	RefillRate int    `json:"refill_rate"`
+}
 
 type Handler struct {
 	store *store.MemoryStore
@@ -35,6 +40,7 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil || req.ClientID == "" {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
 	}
 
 	allowed := h.store.Allow(req.ClientID)
@@ -64,8 +70,6 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	id := path[len("/status/"):]
 
-	fmt.Println("id is:", id)
-
 	type response struct {
 		CurrToken int
 		MaxToken  int
@@ -81,4 +85,31 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(res)
+}
+
+func (h *Handler) Config(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req ConfigRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+
+	if err != nil || req.ClientID == "" {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	h.store.SetClient(req.ClientID, req.MaxTokens, req.RefillRate)
+
+	w.Header().Set("Content-Type", "application/json")
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(ConfigRequest{
+		ClientID:   req.ClientID,
+		MaxTokens:  req.MaxTokens,
+		RefillRate: req.RefillRate,
+	})
+
 }

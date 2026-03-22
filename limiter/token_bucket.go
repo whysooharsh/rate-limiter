@@ -54,3 +54,10 @@ func (tb *TokenBucket) GetStatus() (int, int) {
 	defer tb.mu.Unlock()
 	return tb.tokens, tb.maxTokens
 }
+
+func (tb *TokenBucket) UpdateConfig(maxTokens int, refillRate int) {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
+	tb.maxTokens = maxTokens
+	tb.refillRate = refillRate
+}

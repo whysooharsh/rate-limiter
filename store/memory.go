@@ -48,3 +48,15 @@ func (m *MemoryStore) GetStatus(clientID string) (int, int) {
 
 	return bucket.GetStatus()
 }
+
+func (m *MemoryStore) SetClient(clientID string, maxTokens int, refillRate int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, exists := m.buckets[clientID]
+
+	if !exists {
+		m.buckets[clientID] = limiter.NewTokenBucket(maxTokens, refillRate)
+	} else {
+		m.buckets[clientID].UpdateConfig(maxTokens, refillRate)
+	}
+}

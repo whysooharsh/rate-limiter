@@ -17,7 +17,7 @@ func main() {
 
 	http.HandleFunc("/check", handler.Check)
 	http.HandleFunc("/status/", handler.Status)
-
+	http.HandleFunc("/config", handler.Config)
 	fmt.Println("Rate limiter running on port 8080...")
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
