@@ -16,6 +16,7 @@ func main() {
 	handler := api.NewHandler(memStore)
 
 	http.HandleFunc("/check", handler.Check)
+	http.HandleFunc("/status/", handler.Status)
 
 	fmt.Println("Rate limiter running on port 8080...")
 	err := http.ListenAndServe(":8080", nil)

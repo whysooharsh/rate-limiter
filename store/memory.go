@@ -45,5 +45,6 @@ func (m *MemoryStore) GetStatus(clientID string) (int, int) {
 	if !exists {
 		return 0, 0
 	}
+
 	return bucket.GetStatus()
 }

@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/whysooharsh/rate-limiter/store"
@@ -53,4 +54,31 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 			Message: "rate limit reached",
 		})
 	}
+}
+
+func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	path := r.URL.Path
+	id := path[len("/status/"):]
+
+	fmt.Println("id is:", id)
+
+	type response struct {
+		CurrToken int
+		MaxToken  int
+	}
+	currTok, maxTok := h.store.GetStatus(id)
+
+	if currTok == 0 && maxTok == 0 {
+		http.Error(w, "client not found", http.StatusNotFound)
+		return
+	}
+
+	res := response{CurrToken: currTok, MaxToken: maxTok}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
 }
