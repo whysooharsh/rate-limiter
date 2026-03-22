@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type tokenBucket struct {
+type TokenBucket struct {
 	mu         sync.Mutex
 	tokens     int
 	maxTokens  int
@@ -13,8 +13,8 @@ type tokenBucket struct {
 	lastRefill time.Time
 }
 
-func newTokenBucket(maxTokens int, refillRate int) *tokenBucket {
-	return &tokenBucket{
+func NewTokenBucket(maxTokens int, refillRate int) *TokenBucket {
+	return &TokenBucket{
 		tokens:     maxTokens,
 		maxTokens:  maxTokens,
 		refillRate: refillRate,
@@ -22,7 +22,7 @@ func newTokenBucket(maxTokens int, refillRate int) *tokenBucket {
 	}
 }
 
-func (tb *tokenBucket) refill() {
+func (tb *TokenBucket) refill() {
 	now := time.Now()
 	elapsed := time.Since(tb.lastRefill).Seconds()
 	tokensToAdd := int(elapsed) * tb.refillRate
@@ -36,7 +36,7 @@ func (tb *tokenBucket) refill() {
 	}
 }
 
-func (tb *tokenBucket) Allow() bool {
+func (tb *TokenBucket) Allow() bool {
 	tb.mu.Lock()
 	defer tb.mu.Unlock()
 
@@ -49,7 +49,7 @@ func (tb *tokenBucket) Allow() bool {
 	return false
 }
 
-func (tb *tokenBucket) GetStatus() (int, int) {
+func (tb *TokenBucket) GetStatus() (int, int) {
 	tb.mu.Lock()
 	defer tb.mu.Unlock()
 	return tb.tokens, tb.maxTokens

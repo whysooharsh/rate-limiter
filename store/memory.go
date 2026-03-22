@@ -2,16 +2,18 @@ package store
 
 import (
 	"sync"
+
+	"github.com/whysooharsh/rate-limiter/limiter"
 )
 
 type MemoryStore struct {
 	mu      sync.Mutex
-	buckets map[string]*limiter.tokenBucket
+	buckets map[string]*limiter.TokenBucket
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		buckets: make(map[string]*limiter.tokenBucket),
+		buckets: make(map[string]*limiter.TokenBucket),
 	}
 }
 
@@ -19,7 +21,7 @@ func (m *MemoryStore) AddClient(clientId string, maxTokens int, refillRate int) 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.buckets[clientId] = limiter.newTokenBucket(maxTokens, refillRate)
+	m.buckets[clientId] = limiter.NewTokenBucket(maxTokens, refillRate)
 }
 
 func (m *MemoryStore) Allow(clientID string) bool {
