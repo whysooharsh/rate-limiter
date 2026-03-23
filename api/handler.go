@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/whysooharsh/rate-limiter/store"
@@ -44,6 +45,12 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 	}
 
 	allowed := h.store.Allow(req.ClientID)
+
+	currTok, maxTok := h.store.GetStatus(req.ClientID)
+
+	w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", maxTok))
+	w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", currTok))
+	w.Header().Set("Retry-After", "1")
 
 	w.Header().Set("Content-Type", "application/json")
 
