@@ -38,15 +38,16 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req CheckRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil || req.ClientID == "" {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
+	json.NewDecoder(r.Body).Decode(&req)
+	clientID := req.ClientID
+
+	if clientID == "" {
+		clientID = getClientIP(r)
 	}
 
-	allowed := h.store.Allow(req.ClientID)
+	allowed := h.store.Allow(clientID)
 
-	currTok, maxTok := h.store.GetStatus(req.ClientID)
+	currTok, maxTok := h.store.GetStatus(clientID)
 
 	w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", maxTok))
 	w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", currTok))
@@ -119,4 +120,12 @@ func (h *Handler) Config(w http.ResponseWriter, r *http.Request) {
 		RefillRate: req.RefillRate,
 	})
 
+}
+
+func getClientIP(r *http.Request) string {
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.RemoteAddr
+	}
+	return ip
 }

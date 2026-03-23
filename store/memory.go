@@ -28,11 +28,13 @@ func (m *MemoryStore) Allow(clientID string) bool {
 
 	m.mu.Lock()
 	bucket, exists := m.buckets[clientID]
-	m.mu.Unlock()
 
 	if !exists {
-		return false
+		m.buckets[clientID] = limiter.NewTokenBucket(60, 1)
+		bucket = m.buckets[clientID]
 	}
+	m.mu.Unlock()
+
 	return bucket.Allow()
 
 }
