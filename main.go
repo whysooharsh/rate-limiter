@@ -12,6 +12,7 @@ func main() {
 	memStore := store.NewMemoryStore()
 	memStore.AddClient("client1", 10, 1)
 	memStore.AddClient("client2", 5, 1)
+	memStore.AddClient("loadtest", 1000000, 1000000)
 
 	handler := api.NewHandler(memStore)
 
