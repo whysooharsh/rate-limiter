@@ -35,6 +35,10 @@ func (m *MemoryStore) Allow(clientID string) bool {
 	bucket, exists := m.buckets[clientID]
 
 	if !exists {
+		if len(m.buckets) >= 10000 {
+			m.mu.Unlock()
+			return false
+		}
 		bucket = limiter.NewTokenBucket(DefaultMaxTokens, DefaultRefillRate)
 		m.buckets[clientID] = bucket
 	}
