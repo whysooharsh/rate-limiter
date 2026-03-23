@@ -6,6 +6,11 @@ import (
 	"github.com/whysooharsh/rate-limiter/limiter"
 )
 
+const (
+	DefaultMaxTokens  = 60
+	DefaultRefillRate = 1
+)
+
 type MemoryStore struct {
 	mu      sync.Mutex
 	buckets map[string]*limiter.TokenBucket
@@ -30,8 +35,8 @@ func (m *MemoryStore) Allow(clientID string) bool {
 	bucket, exists := m.buckets[clientID]
 
 	if !exists {
-		m.buckets[clientID] = limiter.NewTokenBucket(60, 1)
-		bucket = m.buckets[clientID]
+		bucket = limiter.NewTokenBucket(DefaultMaxTokens, DefaultRefillRate)
+		m.buckets[clientID] = bucket
 	}
 	m.mu.Unlock()
 

@@ -3,7 +3,10 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
+	"strings"
 
 	"github.com/whysooharsh/rate-limiter/store"
 )
@@ -38,7 +41,10 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req CheckRequest
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
 	clientID := req.ClientID
 
 	if clientID == "" {
@@ -122,10 +128,21 @@ func (h *Handler) Config(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// fixed security and correctness issue with ip from coderrabit feedback
+
 func getClientIP(r *http.Request) string {
-	ip := r.Header.Get("X-Forwarded-For")
-	if ip == "" {
-		ip = r.RemoteAddr
+
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if idx := strings.Index(xff, ","); idx != -1 {
+			return strings.TrimSpace(xff[:idx])
+		}
+		return strings.TrimSpace(xff)
 	}
-	return ip
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+
+	return host
+
 }

@@ -2,6 +2,8 @@ package limiter
 
 import "testing"
 
+// Benchmarks for TokenBucket.Allow.
+
 func BenchmarkAllow(b *testing.B) {
 
 	bucket := NewTokenBucket(1000000, 1000000)
