@@ -18,10 +18,10 @@ type ConfigRequest struct {
 }
 
 type Handler struct {
-	store *store.MemoryStore
+	store store.Store
 }
 
-func NewHandler(store *store.MemoryStore) *Handler {
+func NewHandler(store store.Store) *Handler {
 	return &Handler{store: store}
 }
 

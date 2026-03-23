@@ -1,6 +1,8 @@
 package limiter
 
-import "testing"
+import (
+	"testing"
+)
 
 // Benchmarks for TokenBucket.Allow.
 

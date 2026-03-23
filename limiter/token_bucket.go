@@ -23,16 +23,16 @@ func NewTokenBucket(maxTokens int, refillRate int) *TokenBucket {
 }
 
 func (tb *TokenBucket) refill() {
-	now := time.Now()
-	elapsed := time.Since(tb.lastRefill).Seconds()
-	tokensToAdd := int(elapsed) * tb.refillRate
+	durationPerToken := time.Second / time.Duration(tb.refillRate)
+	elapsed := time.Since(tb.lastRefill)
+	tokensToAdd := int(elapsed / durationPerToken)
 
 	if tokensToAdd > 0 {
 		tb.tokens += tokensToAdd
 		if tb.tokens > tb.maxTokens {
 			tb.tokens = tb.maxTokens
 		}
-		tb.lastRefill = now
+		tb.lastRefill = tb.lastRefill.Add(time.Duration(tokensToAdd) * durationPerToken)
 	}
 }
 
@@ -52,6 +52,7 @@ func (tb *TokenBucket) Allow() bool {
 func (tb *TokenBucket) GetStatus() (int, int) {
 	tb.mu.Lock()
 	defer tb.mu.Unlock()
+	tb.refill()
 	return tb.tokens, tb.maxTokens
 }
 

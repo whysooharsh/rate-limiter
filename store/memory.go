@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	DefaultMaxTokens  = 60
+	DefaultMaxTokens  = 10
 	DefaultRefillRate = 1
 )
 
