@@ -42,12 +42,19 @@ if tokens == nil then
 end
 
 local elapsed = math.max(0, now - last_refill)
-local time_per_token = 1000 / refill_rate
-local refill = math.floor(elapsed / time_per_token)
-
-if refill > 0 then
-    tokens = math.min(max_tokens, tokens + refill)
-    last_refill = last_refill + math.floor(refill * time_per_token)
+local refill = 0
+if refill_rate > 0 then
+    local time_per_token = 1000 / refill_rate
+    if time_per_token > 0 then
+        refill = math.floor(elapsed / time_per_token)
+        if refill > 0 then
+            tokens = math.min(max_tokens, tokens + refill)
+            last_refill = last_refill + math.floor(refill * time_per_token)
+        end
+    else
+        tokens = max_tokens
+        last_refill = now
+    end
 end
 
 local allowed = 0
@@ -56,7 +63,7 @@ if tokens > 0 then
     allowed = 1
 end
 
-redis.call('HMSET', key, 'tokens', tokens, 'last_refill', last_refill, 'max_tokens', max_tokens, 'refill_rate', refill_rate)
+redis.call('HSET', key, 'tokens', tokens, 'last_refill', last_refill, 'max_tokens', max_tokens, 'refill_rate', refill_rate)
 redis.call('EXPIRE', key, 3600)
 return allowed
 `
@@ -78,8 +85,15 @@ if tokens == nil then
 end
 
 local elapsed = math.max(0, now - last_refill)
-local time_per_token = 1000 / refill_rate
-local refill = math.floor(elapsed / time_per_token)
+local refill = 0
+if refill_rate > 0 then
+    local time_per_token = 1000 / refill_rate
+    if time_per_token > 0 then
+        refill = math.floor(elapsed / time_per_token)
+    else
+        refill = max_tokens
+    end
+end
 tokens = math.min(max_tokens, tokens + refill)
 
 return {tokens, max_tokens}
@@ -119,7 +133,7 @@ func (r *RedisStore) GetStatus(clientID string) (int, int) {
 
 func (r *RedisStore) SetClient(clientID string, maxTokens int, refillRate int) {
 	key := "rate:" + clientID
-	r.client.HMSet(r.ctx, key,
+	r.client.HSet(r.ctx, key,
 		"tokens", maxTokens,
 		"max_tokens", maxTokens,
 		"refill_rate", refillRate,

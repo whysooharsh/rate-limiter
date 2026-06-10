@@ -23,7 +23,13 @@ func NewTokenBucket(maxTokens int, refillRate int) *TokenBucket {
 }
 
 func (tb *TokenBucket) refill() {
+	if tb.refillRate <= 0 {
+		return
+	}
 	durationPerToken := time.Second / time.Duration(tb.refillRate)
+	if durationPerToken == 0 {
+		durationPerToken = 1
+	}
 	elapsed := time.Since(tb.lastRefill)
 	tokensToAdd := int(elapsed / durationPerToken)
 

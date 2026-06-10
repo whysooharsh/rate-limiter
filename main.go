@@ -24,7 +24,6 @@ func main() {
 		mem := store.NewMemoryStore()
 		mem.SetClient("client1", 10, 1)
 		mem.SetClient("client2", 5, 1)
-		mem.SetClient("loadtest", 10000000, 10000000)
 		s = mem
 		fmt.Println("Using in-memory store")
 	}
