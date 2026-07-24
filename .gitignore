@@ -13,5 +13,9 @@ cpu.prof
 .idea/
 
 # test
+/tests
 k6.js
 *_test.go
+
+# files
+burst_correctness.js

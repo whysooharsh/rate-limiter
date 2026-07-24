@@ -42,7 +42,7 @@ func (tb *TokenBucket) refill() {
 	}
 }
 
-func (tb *TokenBucket) Allow() bool {
+func (tb *TokenBucket) Allow() (bool, int, int) {
 	tb.mu.Lock()
 	defer tb.mu.Unlock()
 
@@ -50,9 +50,9 @@ func (tb *TokenBucket) Allow() bool {
 
 	if tb.tokens > 0 {
 		tb.tokens--
-		return true
+		return true, tb.tokens, tb.maxTokens
 	}
-	return false
+	return false, tb.tokens, tb.maxTokens
 }
 
 func (tb *TokenBucket) GetStatus() (int, int) {
@@ -67,4 +67,8 @@ func (tb *TokenBucket) UpdateConfig(maxTokens int, refillRate int) {
 	defer tb.mu.Unlock()
 	tb.maxTokens = maxTokens
 	tb.refillRate = refillRate
+
+	if tb.tokens > tb.maxTokens {
+		tb.tokens = maxTokens
+	}
 }

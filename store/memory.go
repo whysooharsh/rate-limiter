@@ -44,9 +44,7 @@ func (m *MemoryStore) Allow(clientID string) (bool, int, int) {
 	}
 	m.mu.Unlock()
 
-	allowed := bucket.Allow()
-	currTok, maxTok := bucket.GetStatus()
-	return allowed, currTok, maxTok
+	return bucket.Allow()
 
 }
 
