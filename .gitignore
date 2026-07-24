@@ -1,1 +1,17 @@
 .env
+
+# Local build artifacts and generated files
+rate-limiter
+limiter.test
+cpu.prof
+*.exe
+*.out
+*.prof
+
+# Editors
+.vscode/
+.idea/
+
+# test
+k6.js
+*_test.go

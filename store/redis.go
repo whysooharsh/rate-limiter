@@ -65,7 +65,7 @@ end
 
 redis.call('HSET', key, 'tokens', tokens, 'last_refill', last_refill, 'max_tokens', max_tokens, 'refill_rate', refill_rate)
 redis.call('EXPIRE', key, 3600)
-return allowed
+return {allowed, tokens, max_tokens}
 `
 
 const luaStatusScript = `
@@ -99,18 +99,25 @@ tokens = math.min(max_tokens, tokens + refill)
 return {tokens, max_tokens}
 `
 
-func (r *RedisStore) Allow(clientID string) bool {
+// this removes the race where a second
+// request could mutate the bucket between Allow and a separate GetStatus.
+func (r *RedisStore) Allow(clientID string) (bool, int, int) {
 	key := "rate:" + clientID
 	now := time.Now().UnixMilli()
 
 	result, err := r.client.Eval(r.ctx, luaScript, []string{key},
-		DefaultMaxTokens, DefaultRefillRate, now).Int()
+		DefaultMaxTokens, DefaultRefillRate, now).Slice()
 
 	if err != nil {
-		return true // fail open — if Redis is down, allow the request
+		return true, 0, 0 // fail open — if Redis is down, allow the request
 		// tradeoff -> availability > consistency
 	}
-	return result == 1
+
+	allowed := result[0].(int64) == 1
+	tokens := int(result[1].(int64))
+	maxTokens := int(result[2].(int64))
+
+	return allowed, tokens, maxTokens
 }
 
 func (r *RedisStore) GetStatus(clientID string) (int, int) {

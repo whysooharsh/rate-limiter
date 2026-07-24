@@ -51,9 +51,7 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 		clientID = getClientIP(r)
 	}
 
-	allowed := h.store.Allow(clientID)
-
-	currTok, maxTok := h.store.GetStatus(clientID)
+	allowed, currTok, maxTok := h.store.Allow(clientID)
 
 	w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", maxTok))
 	w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", currTok))

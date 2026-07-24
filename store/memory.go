@@ -29,7 +29,7 @@ func (m *MemoryStore) AddClient(clientId string, maxTokens int, refillRate int) 
 	m.buckets[clientId] = limiter.NewTokenBucket(maxTokens, refillRate)
 }
 
-func (m *MemoryStore) Allow(clientID string) bool {
+func (m *MemoryStore) Allow(clientID string) (bool, int, int) {
 
 	m.mu.Lock()
 	bucket, exists := m.buckets[clientID]
@@ -37,14 +37,16 @@ func (m *MemoryStore) Allow(clientID string) bool {
 	if !exists {
 		if len(m.buckets) >= 10000 {
 			m.mu.Unlock()
-			return false
+			return false, 0, 0
 		}
 		bucket = limiter.NewTokenBucket(DefaultMaxTokens, DefaultRefillRate)
 		m.buckets[clientID] = bucket
 	}
 	m.mu.Unlock()
 
-	return bucket.Allow()
+	allowed := bucket.Allow()
+	currTok, maxTok := bucket.GetStatus()
+	return allowed, currTok, maxTok
 
 }
 
