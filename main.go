@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -32,6 +33,9 @@ func main() {
 	http.HandleFunc("/check", handler.Check)
 	http.HandleFunc("/status/", handler.Status)
 	http.HandleFunc("/config", handler.Config)
+	http.HandleFunc("/baseline", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 
 	port := os.Getenv("PORT")
 	if port == "" {

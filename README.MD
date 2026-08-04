@@ -46,19 +46,19 @@ curl -X POST http://localhost:8080/config \
 
 Use the same honest test context:
 
-> Benchmarked on an AMD Ryzen 5 7520U system with 4 cores/8 threads and 8 GB RAM. k6, the Go service, and Redis ran on the same machine over loopback. HTTP results use 200 concurrent virtual users for 30 seconds.
+> Benchmarked on an AMD Ryzen 5 7520U system with 4 cores/8 threads and 8 GB RAM. `hey`, the Go service, and Redis all ran on the same machine over loopback. HTTP results use 200 concurrent connections for 30 seconds. (Earlier runs used k6 as the load generator; k6 itself was consuming up to 600% CPU on this machine, which was competing with the server under test — these results were re-measured with `hey`, a lighter-weight client, to remove that confound.)
 
 ### HTTP results
 
-| Backend              |  Throughput | Average latency |      p99 latency | Failed requests |
-| -------------------- | ----------: | --------------: | ---------------: | --------------: |
-| In-memory            | 19.8K req/s |         2.31 ms |          8.89 ms |              0% |
-| Redis + Lua          | 14.3K req/s |         3.26 ms | Not measured yet |              0% |
-| Unprotected baseline | 20.5K req/s |         2.22 ms |          8.85 ms |              0% |
+| Backend              |  Throughput | Average latency | p99 latency | Failed requests |
+| -------------------- | ----------: | --------------: | ----------: | --------------: |
+| In-memory            | 30.1K req/s |          6.6 ms |     17.2 ms |              0% |
+| Redis + Lua          | 19.4K req/s |         10.3 ms |     14.7 ms |              0% |
+| Unprotected baseline | 32.7K req/s |          6.1 ms |     16.5 ms |              0% |
 
-The reported in-memory and baseline rows use the middle-throughput run from three repetitions. The Redis throughput and average latency are averages of three runs; Redis p99 will be added after repeating the test with p99 output enabled.
+Client was reconfigured to an effectively unlimited bucket (`max_tokens`/`refill_rate` set very high) before each run, so these numbers reflect allowed-traffic throughput rather than mostly-rejected traffic. All HTTP tests used one client ID per run, making them hot-key workloads. These results describe this machine and topology and should not be treated as universal capacity figures.
 
-All HTTP tests used one client ID per run, making them hot-key workloads. These results describe this machine and topology and should not be treated as universal capacity figures.
+**Note:** profiling under load (`pprof`) showed the token bucket logic itself accounts for a small fraction of total CPU time — the majority goes to the Go HTTP stack itself (socket syscalls, request/response buffering, timestamping), which is expected for any HTTP service at this scale. Profiling also surfaced a real bug: `/check` was making two separate calls into the store per request instead of one, adding latency and a small race window between them — both backends now return the decision and updated token count from a single atomic call.
 
 ### Core benchmarks
 
@@ -82,11 +82,10 @@ go test ./limiter ./store \
   -cpu=1,2,4,8 \
   -count=3
 
-CLIENT_ID="memory-$(date +%s)" \
-VUS=200 \
-DURATION=30s \
-k6 run \
-  --summary-trend-stats="avg,med,p(90),p(95),p(99),max" \
-  tests/load_test.js
+curl -X POST http://localhost:8080/config \
+  -H "Content-Type: application/json" \
+  -d '{"client_id":"hotclient","max_tokens":1000000000,"refill_rate":1000000000}'
 
+hey -z 30s -c 200 -m POST -H 'Content-Type: application/json' \
+  -d '{"client_id":"hotclient"}' http://localhost:8080/check
 ```
