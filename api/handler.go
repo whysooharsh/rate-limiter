@@ -18,11 +18,12 @@ type ConfigRequest struct {
 }
 
 type Handler struct {
-	store store.Store
+	store      store.Store
+	trustProxy bool
 }
 
 func NewHandler(store store.Store) *Handler {
-	return &Handler{store: store}
+	return &Handler{store: store, trustProxy: false}
 }
 
 type CheckRequest struct {
@@ -48,7 +49,7 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 	clientID := req.ClientID
 
 	if clientID == "" {
-		clientID = getClientIP(r)
+		clientID = h.getClientIP(r)
 	}
 
 	allowed, currTok, maxTok := h.store.Allow(clientID)
@@ -126,15 +127,16 @@ func (h *Handler) Config(w http.ResponseWriter, r *http.Request) {
 
 }
 
-// fixed security and correctness issue with ip from coderrabit feedback
+func (h *Handler) getClientIP(r *http.Request) string {
 
-func getClientIP(r *http.Request) string {
-
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if idx := strings.Index(xff, ","); idx != -1 {
-			return strings.TrimSpace(xff[:idx])
+	if h.trustProxy {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			if idx := strings.Index(xff, ","); idx != -1 {
+				return strings.TrimSpace(xff[:idx])
+			}
+			return strings.TrimSpace(xff)
 		}
-		return strings.TrimSpace(xff)
+
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
