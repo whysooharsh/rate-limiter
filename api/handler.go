@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,13 +18,19 @@ type ConfigRequest struct {
 	RefillRate int    `json:"refill_rate"`
 }
 
-type Handler struct {
-	store      store.Store
-	trustProxy bool
+type HandlerOptions struct {
+	TrustProxy    bool
+	TrustClientID bool
+	AdminAPIKey   string
 }
 
-func NewHandler(store store.Store) *Handler {
-	return &Handler{store: store, trustProxy: false}
+type Handler struct {
+	store   store.Store
+	options HandlerOptions
+}
+
+func NewHandler(store store.Store, opts HandlerOptions) *Handler {
+	return &Handler{store: store, options: opts}
 }
 
 type CheckRequest struct {
@@ -40,23 +47,29 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req CheckRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&req); err != nil && err != io.EOF {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	clientID := req.ClientID
-
-	if clientID == "" {
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	clientID := strings.TrimSpace(req.ClientID)
+	if !h.options.TrustClientID || clientID == "" {
 		clientID = h.getClientIP(r)
 	}
-
+	if clientID == "" {
+		http.Error(w, "could not determine client identity", http.StatusBadRequest)
+		return
+	}
 	allowed, currTok, maxTok := h.store.Allow(clientID)
 
 	w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", maxTok))
 	w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", currTok))
-	w.Header().Set("Retry-After", "1")
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -67,6 +80,7 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 			Message: "request allowed",
 		})
 	} else {
+		w.Header().Set("Retry-After", "1")
 		w.WriteHeader(http.StatusTooManyRequests)
 		json.NewEncoder(w).Encode(CheckResponse{
 			Allowed: false,
@@ -81,19 +95,22 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := r.URL.Path
-	id := path[len("/status/"):]
+	id := strings.TrimPrefix(path, "/status/")
+	if id == "" {
+		http.Error(w, "client id is required", http.StatusBadRequest)
+		return
+	}
+	currTok, maxTok, found := h.store.GetStatus(id)
+
+	if !found {
+		http.Error(w, "client not found", http.StatusNotFound)
+		return
+	}
 
 	type response struct {
 		CurrToken int
 		MaxToken  int
 	}
-	currTok, maxTok := h.store.GetStatus(id)
-
-	if currTok == 0 && maxTok == 0 {
-		http.Error(w, "client not found", http.StatusNotFound)
-		return
-	}
-
 	res := response{CurrToken: currTok, MaxToken: maxTok}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -106,16 +123,52 @@ func (h *Handler) Config(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.options.AdminAPIKey == "" {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	providedKey := r.Header.Get("X-Admin-Key")
+	if subtle.ConstantTimeCompare([]byte(providedKey), []byte(h.options.AdminAPIKey)) != 1 {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req ConfigRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
+	dec := json.NewDecoder(r.Body)
+	err := dec.Decode(&req)
 
 	if err != nil || req.ClientID == "" {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
+	if dec.Decode(&struct{}{}) != io.EOF {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.MaxTokens <= 0 {
+		http.Error(w, "max tokens must be greater than 0", http.StatusBadRequest)
+		return
+	}
+
+	if req.MaxTokens > 1000000000 {
+		http.Error(w, "max tokens must not exceed 1000000000", http.StatusBadRequest)
+		return
+	}
+
+	if req.RefillRate < 0 {
+		http.Error(w, "refill rate must be non-negative", http.StatusBadRequest)
+		return
+	}
+
+	if req.RefillRate > 1000000000 {
+		http.Error(w, "refill rate must not exceed 1000000000", http.StatusBadRequest)
+		return
+	}
 
 	h.store.SetClient(req.ClientID, req.MaxTokens, req.RefillRate)
-
 	w.Header().Set("Content-Type", "application/json")
 
 	w.WriteHeader(http.StatusOK)
@@ -129,12 +182,10 @@ func (h *Handler) Config(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) getClientIP(r *http.Request) string {
 
-	if h.trustProxy {
+	if h.options.TrustProxy {
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			if idx := strings.Index(xff, ","); idx != -1 {
-				return strings.TrimSpace(xff[:idx])
-			}
-			return strings.TrimSpace(xff)
+			first, _, _ := strings.Cut(xff, ",")
+			return strings.TrimSpace(first)
 		}
 
 	}

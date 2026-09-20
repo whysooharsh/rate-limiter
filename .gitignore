@@ -19,3 +19,5 @@ k6.js
 
 # files
 burst_correctness.js
+
+*.txt

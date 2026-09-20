@@ -120,7 +120,7 @@ func (r *RedisStore) Allow(clientID string) (bool, int, int) {
 	return allowed, tokens, maxTokens
 }
 
-func (r *RedisStore) GetStatus(clientID string) (int, int) {
+func (r *RedisStore) GetStatus(clientID string) (int, int, bool) {
 	key := "rate:" + clientID
 	now := time.Now().UnixMilli()
 
@@ -128,14 +128,14 @@ func (r *RedisStore) GetStatus(clientID string) (int, int) {
 		DefaultMaxTokens, DefaultRefillRate, now).Result()
 
 	if err != nil {
-		return 0, 0
+		return 0, 0, false
 	}
 
-	vals := result.([]interface{})
+	vals := result.([]any)
 	tokens := int(vals[0].(int64))
 	maxTokens := int(vals[1].(int64))
 
-	return tokens, maxTokens
+	return tokens, maxTokens, true
 }
 
 func (r *RedisStore) SetClient(clientID string, maxTokens int, refillRate int) {

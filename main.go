@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/whysooharsh/rate-limiter/api"
@@ -28,7 +31,11 @@ func main() {
 		s = mem
 		fmt.Println("Using in-memory store")
 	}
-	handler := api.NewHandler(s)
+	handler := api.NewHandler(s, api.HandlerOptions{
+		TrustProxy:    false,
+		TrustClientID: false,
+		AdminAPIKey:   os.Getenv("ADMIN_API_KEY"),
+	})
 
 	http.HandleFunc("/check", handler.Check)
 	http.HandleFunc("/status/", handler.Status)
@@ -43,8 +50,26 @@ func main() {
 	}
 	fmt.Println("Rate limiter running on port " + port + "...")
 
-	err := http.ListenAndServe(":"+port, nil)
-	if err != nil {
+	server := &http.Server{
+		Addr:              ":" + port,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		<-ctx.Done()
+		fmt.Println("shutting down...")
+		shutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		server.Shutdown(shutCtx)
+	}()
+
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		fmt.Println("Server error:", err)
 	}
 }

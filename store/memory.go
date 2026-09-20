@@ -87,7 +87,7 @@ func (m *MemoryStore) Allow(clientID string) (bool, int, int) {
 
 }
 
-func (m *MemoryStore) GetStatus(clientID string) (int, int) {
+func (m *MemoryStore) GetStatus(clientID string) (int, int, bool) {
 	m.mu.Lock()
 	bucket, exists := m.buckets[clientID]
 	if exists {
@@ -96,10 +96,11 @@ func (m *MemoryStore) GetStatus(clientID string) (int, int) {
 	m.mu.Unlock()
 
 	if !exists {
-		return 0, 0
+		return 0, 0, false
 	}
 
-	return bucket.bucket.GetStatus()
+	token, maxTokens := bucket.bucket.GetStatus()
+	return token, maxTokens, true
 }
 
 func (m *MemoryStore) SetClient(clientID string, maxTokens int, refillRate int) {
