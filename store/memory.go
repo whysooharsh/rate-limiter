@@ -87,6 +87,9 @@ func (m *MemoryStore) Allow(clientID string) (bool, int, int) {
 
 }
 
+// this counts as activity, same as Allow - a dashboard polling this
+// endpoint should not cause its own bucket to expire mid-observation.
+
 func (m *MemoryStore) GetStatus(clientID string) (int, int, bool) {
 	m.mu.Lock()
 	bucket, exists := m.buckets[clientID]
